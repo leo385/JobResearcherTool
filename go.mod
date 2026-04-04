@@ -2,7 +2,10 @@ module example/jobresearchertool
 
 go 1.26.1
 
-require fyne.io/fyne/v2 v2.7.3
+require (
+	fyne.io/fyne/v2 v2.7.3
+	github.com/dslipak/pdf v0.0.2
+)
 
 require (
 	fyne.io/systray v1.12.0 // indirect
