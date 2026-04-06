@@ -2,17 +2,13 @@ package main
 
 import (
 	"fmt"
-	"image/color"
 
 	"fyne.io/fyne/v2"
-	"fyne.io/fyne/v2/canvas"
 	"fyne.io/fyne/v2/dialog"
 	"fyne.io/fyne/v2/storage"
 )
 
-var filePathText = canvas.NewText("Choose CV file", color.White)
-
-func OpenFilePicker(myWindow fyne.Window) {
+func OpenFilePicker(myWindow fyne.Window, onSuccess func(string)) {
 	fileDialog := dialog.NewFileOpen(func(reader fyne.URIReadCloser, err error) {
 		if err != nil {
 			dialog.ShowError(err, myWindow)
@@ -25,8 +21,9 @@ func OpenFilePicker(myWindow fyne.Window) {
 
 		filePath := reader.URI().Path()
 		fmt.Println("Attached file:", filePath)
-		filePathText.Text = filePath
-		filePathText.Refresh()
+
+		// delegate to external file processing
+		onSuccess(filePath)
 
 		defer reader.Close()
 
