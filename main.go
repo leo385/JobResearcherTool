@@ -1,8 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"image/color"
+	"log"
+	"strings"
 
 	"fyne.io/fyne/v2"
 	"fyne.io/fyne/v2/app"
@@ -13,11 +16,30 @@ import (
 
 	"fyne.io/fyne/v2/theme"
 	"fyne.io/fyne/v2/widget"
+	"github.com/go-resty/resty/v2"
 )
+
+/* Struct apropriate to Qwen AI model response */
+type JsonAIResponse struct {
+	Output []struct {
+		Content string `json:"content"`
+	} `json:"output"`
+}
+
+type CVData struct {
+	Name  string `json:"name"`
+	Email string `json:"email"`
+}
+
+type CVMappedFields struct {
+	FNameEntry  *widget.Entry
+	FEmailEntry *widget.Entry
+}
 
 type FileState struct {
 	CurrentFilePath string
 	StatusLabelPath *canvas.Text
+	CVMappedFields  *CVMappedFields
 	Window          fyne.Window
 }
 
@@ -31,17 +53,81 @@ func (fs *FileState) HandleFileSelection(path string) {
 	if err != nil {
 		panic(err)
 	}
-	fmt.Println(cv_content)
+
+	// Init http request to AI model
+	json_result := &JsonAIResponse{}
+	client := resty.New()
+
+	go func() { // run in goroutine to avoid fyne being frozen
+		resp, err := client.R().
+			SetHeader("Content-Type", "application/json").
+			SetBody(map[string]interface{}{
+				"model":          "qwen2.5-coder-7b-instruct",
+				"input":          "Parse this CV to JSON (name, email), and response only JSON!" + cv_content,
+				"stream":         false,
+				"context_length": 8000,
+			}).
+			SetResult(json_result).
+			Post("http://192.168.100.10:3001/api/v1/chat")
+
+		if err != nil {
+			log.Fatalf("Connection failed: %v", err)
+		}
+
+		if resp.IsError() {
+			fmt.Printf("Server AI returned error: %s\n", resp.Status())
+			return
+		}
+
+		// Receive AI answer parsed to JSON struct
+		if len(json_result.Output) > 0 {
+			rawContent := json_result.Output[0].Content
+			fmt.Println(rawContent)
+
+			// Json cleaning from necessary markdowns
+			cleanJSON := strings.TrimSpace(rawContent)
+			cleanJSON = strings.TrimPrefix(cleanJSON, "```json")
+			cleanJSON = strings.TrimSuffix(cleanJSON, "```")
+			cleanJSON = strings.TrimSpace(cleanJSON)
+
+			fmt.Printf("After Trim Operation: %s", cleanJSON)
+
+			finalData := &CVData{}
+			err := json.Unmarshal([]byte(cleanJSON), finalData)
+			if err != nil {
+				fmt.Println("Error unmarshaled JSON into struct: ", err)
+				return
+			}
+
+			fmt.Printf("Success, received data: %s, %s\n", finalData.Name, finalData.Email)
+
+			if finalData != nil {
+				if fs.CVMappedFields.FNameEntry != nil {
+					fyne.Do(func() {
+						fs.CVMappedFields.FNameEntry.SetText(finalData.Name)
+					})
+				}
+				if fs.CVMappedFields.FEmailEntry != nil {
+					fyne.Do(func() {
+						fs.CVMappedFields.FEmailEntry.SetText(finalData.Email)
+					})
+				}
+			}
+		}
+	}()
+
 }
 
 type sWindow struct {
+	myApp       *fyne.App
+	id          string
 	windowTitle string
 	width       float32
 	height      float32
 }
 
 func (w *sWindow) deriveWindow() fyne.Window {
-	myApp := app.New()
+	myApp := app.NewWithID(w.id)
 	myWindow := myApp.NewWindow(w.windowTitle)
 	myWindow.Resize(fyne.NewSize(w.width, w.height))
 	return myWindow
@@ -49,6 +135,7 @@ func (w *sWindow) deriveWindow() fyne.Window {
 
 func main() {
 	sWindow := &sWindow{
+		id:          "com.main.jobresearcher.tool",
 		windowTitle: "JobResearcherTool v0.0.1",
 		width:       800,
 		height:      600,
@@ -64,6 +151,7 @@ func main() {
 
 	fileState := &FileState{
 		StatusLabelPath: canvas.NewText("Choose your CV file", color.White),
+		CVMappedFields:  &CVMappedFields{},
 		Window:          currentWindow,
 	}
 
@@ -74,13 +162,19 @@ func main() {
 	content := container.New(layout.NewHBoxLayout(), layout.NewSpacer(), fileState.StatusLabelPath, selectBtn, sMyLayout.rightMargin)
 
 	/* basic cv input fields */
-	fName := CreateInputWithPlaceholder("Type your name", 200)
-	fEmail := CreateInputWithPlaceholder("Type your email", 200)
+	fileState.CVMappedFields.FNameEntry = widget.NewEntry()
+	fileState.CVMappedFields.FNameEntry.SetPlaceHolder("Type your name")
+	fileState.CVMappedFields.FNameEntry.Resize(fyne.NewSize(200, fileState.CVMappedFields.FNameEntry.MinSize().Height))
+
+	fileState.CVMappedFields.FEmailEntry = widget.NewEntry()
+	fileState.CVMappedFields.FEmailEntry.SetPlaceHolder("Type your email")
+	fileState.CVMappedFields.FEmailEntry.Resize(fyne.NewSize(200, fileState.CVMappedFields.FNameEntry.MinSize().Height))
+
 	LT_Attach_Cv := container.New(layout.NewVBoxLayout(), sMyLayout.topMargin, content)
 
-	sMyLayout.CreateNewRow(LT_Attach_Cv, fName)
+	sMyLayout.CreateNewRow(LT_Attach_Cv, container.NewWithoutLayout(fileState.CVMappedFields.FNameEntry))
 	sMyLayout.CreateNewRow(LT_Attach_Cv, sMyLayout.rowGap)
-	sMyLayout.CreateNewRow(LT_Attach_Cv, fEmail)
+	sMyLayout.CreateNewRow(LT_Attach_Cv, container.NewWithoutLayout(fileState.CVMappedFields.FEmailEntry))
 
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Attach your CV", LT_Attach_Cv),
