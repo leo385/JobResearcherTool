@@ -27,13 +27,19 @@ type JsonAIResponse struct {
 }
 
 type CVData struct {
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	Name        string `json:"name"`
+	Email       string `json:"email"`
+	PhoneNumber string `json:"phone number"`
+	City        string `json:"city"`
+	BirthDate   string `json:"birth date"`
 }
 
 type CVMappedFields struct {
-	FNameEntry  *widget.Entry
-	FEmailEntry *widget.Entry
+	FNameEntry        *widget.Entry
+	FEmailEntry       *widget.Entry
+	FPhoneNumberEntry *widget.Entry
+	FCityBirthEntry   *widget.Entry
+	FBirthDateEntry   *widget.Entry
 }
 
 type FileState struct {
@@ -63,7 +69,7 @@ func (fs *FileState) HandleFileSelection(path string) {
 			SetHeader("Content-Type", "application/json").
 			SetBody(map[string]interface{}{
 				"model":          "qwen2.5-coder-7b-instruct",
-				"input":          "Parse this CV to JSON (name, email), and response only JSON!" + cv_content,
+				"input":          "Parse this CV to JSON (name(Capitalize every word), email, phone number, city, birth date (dd/mm/year)), don't use _ instead of space in key attributes, and response only JSON!" + cv_content,
 				"stream":         false,
 				"context_length": 8000,
 			}).
@@ -102,14 +108,29 @@ func (fs *FileState) HandleFileSelection(path string) {
 			fmt.Printf("Success, received data: %s, %s\n", finalData.Name, finalData.Email)
 
 			if finalData != nil {
-				if fs.CVMappedFields.FNameEntry != nil {
+				if len(fs.CVMappedFields.FNameEntry.Text) <= 0 {
 					fyne.Do(func() {
 						fs.CVMappedFields.FNameEntry.SetText(finalData.Name)
 					})
 				}
-				if fs.CVMappedFields.FEmailEntry != nil {
+				if len(fs.CVMappedFields.FEmailEntry.Text) <= 0 {
 					fyne.Do(func() {
 						fs.CVMappedFields.FEmailEntry.SetText(finalData.Email)
+					})
+				}
+				if len(fs.CVMappedFields.FPhoneNumberEntry.Text) <= 0 {
+					fyne.Do(func() {
+						fs.CVMappedFields.FPhoneNumberEntry.SetText(finalData.PhoneNumber)
+					})
+				}
+				if len(fs.CVMappedFields.FCityBirthEntry.Text) <= 0 {
+					fyne.Do(func() {
+						fs.CVMappedFields.FCityBirthEntry.SetText(finalData.City)
+					})
+				}
+				if len(fs.CVMappedFields.FBirthDateEntry.Text) <= 0 {
+					fyne.Do(func() {
+						fs.CVMappedFields.FBirthDateEntry.SetText(finalData.BirthDate)
 					})
 				}
 			}
@@ -168,13 +189,31 @@ func main() {
 
 	fileState.CVMappedFields.FEmailEntry = widget.NewEntry()
 	fileState.CVMappedFields.FEmailEntry.SetPlaceHolder("Type your email")
-	fileState.CVMappedFields.FEmailEntry.Resize(fyne.NewSize(200, fileState.CVMappedFields.FNameEntry.MinSize().Height))
+	fileState.CVMappedFields.FEmailEntry.Resize(fyne.NewSize(200, fileState.CVMappedFields.FEmailEntry.MinSize().Height))
+
+	fileState.CVMappedFields.FPhoneNumberEntry = widget.NewEntry()
+	fileState.CVMappedFields.FPhoneNumberEntry.SetPlaceHolder("Type your phone number")
+	fileState.CVMappedFields.FPhoneNumberEntry.Resize(fyne.NewSize(200, fileState.CVMappedFields.FPhoneNumberEntry.MinSize().Height))
+
+	fileState.CVMappedFields.FCityBirthEntry = widget.NewEntry()
+	fileState.CVMappedFields.FCityBirthEntry.SetPlaceHolder("Type your city")
+	fileState.CVMappedFields.FCityBirthEntry.Resize(fyne.NewSize(200, fileState.CVMappedFields.FCityBirthEntry.MinSize().Height))
+
+	fileState.CVMappedFields.FBirthDateEntry = widget.NewEntry()
+	fileState.CVMappedFields.FBirthDateEntry.SetPlaceHolder("Type your birth date")
+	fileState.CVMappedFields.FBirthDateEntry.Resize(fyne.NewSize(200, fileState.CVMappedFields.FBirthDateEntry.MinSize().Height))
 
 	LT_Attach_Cv := container.New(layout.NewVBoxLayout(), sMyLayout.topMargin, content)
 
 	sMyLayout.CreateNewRow(LT_Attach_Cv, container.NewWithoutLayout(fileState.CVMappedFields.FNameEntry))
 	sMyLayout.CreateNewRow(LT_Attach_Cv, sMyLayout.rowGap)
 	sMyLayout.CreateNewRow(LT_Attach_Cv, container.NewWithoutLayout(fileState.CVMappedFields.FEmailEntry))
+	sMyLayout.CreateNewRow(LT_Attach_Cv, sMyLayout.rowGap)
+	sMyLayout.CreateNewRow(LT_Attach_Cv, container.NewWithoutLayout(fileState.CVMappedFields.FPhoneNumberEntry))
+	sMyLayout.CreateNewRow(LT_Attach_Cv, sMyLayout.rowGap)
+	sMyLayout.CreateNewRow(LT_Attach_Cv, container.NewWithoutLayout(fileState.CVMappedFields.FCityBirthEntry))
+	sMyLayout.CreateNewRow(LT_Attach_Cv, sMyLayout.rowGap)
+	sMyLayout.CreateNewRow(LT_Attach_Cv, container.NewWithoutLayout(fileState.CVMappedFields.FBirthDateEntry))
 
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Attach your CV", LT_Attach_Cv),
