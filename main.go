@@ -217,7 +217,7 @@ func main() {
 
 	tabs := container.NewAppTabs(
 		container.NewTabItem("Attach your CV", LT_Attach_Cv),
-		container.NewTabItem("Set board URL", widget.NewLabel("World!")),
+		container.NewTabItem("Set board URL", ui_board(currentWindow, sMyLayout)),
 		container.NewTabItem("Job specification", widget.NewLabel("World!")),
 	)
 
